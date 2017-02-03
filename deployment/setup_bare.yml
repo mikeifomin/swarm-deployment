@@ -1,0 +1,34 @@
+---
+- hosts: all
+  gather_facts: no
+  pre_tasks:
+    - raw: rm -rf /var/lib/dpkg/lock
+    - raw: apt-get update -qq
+    - raw: apt-get install -qq python-minimal
+
+- hosts: all
+  roles:
+    - role: angstwad.docker_ubuntu
+  tasks:
+    - apt: name={{item}}
+      with_items:
+        - tmux
+        - curl
+        - tree
+        - htop
+        - mosh
+        - vim
+        - zsh
+        - git
+        - software-properties-common
+      
+    - pip: name=docker state=absent
+    - pip: name=docker-py state=absent
+    - pip: name=docker
+    - copy:
+        dest: "/etc/docker/daemon.json"
+        content: |
+          {"experimental":true}
+    - service: 
+        name: docker
+        state: restarted

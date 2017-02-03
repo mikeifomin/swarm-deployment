@@ -1,0 +1,78 @@
+---
+- hosts: localhost
+  tasks:
+#   - command: "docker build -t registry.mif.io/swarm-labels-dns:test /Users/mike/Github/swarm-labels-dns"
+#   - command: "docker push registry.mif.io/swarm-labels-dns:test"
+ 
+- hosts: all
+  vars_files:
+    - vars.yml
+    - vars.credentials.yml
+  tasks:
+    - file: dest=/root/traefik/etc state=directory
+    - copy:
+        dest: /root/traefik/etc/traefik.toml
+        content: |
+          [file]
+          watch= true
+          filename = "config.toml"
+   
+    - copy:
+        dest: /root/traefik/etc/config.toml
+        content: |
+          [entryPoints]
+            [entryPoints.http]
+            address = ":80"
+              [entryPoints.http.redirect]
+              entryPoint = "https"
+            [entryPoints.https]
+              address = ":443"
+              [entryPoints.https.tls]
+          [docker]
+          endpoint = "unix:///var/run/docker.sock"
+          domain = "docker.localhost"
+          watch = true
+          [acme]
+          email = "mikeifomin@gmail.com"
+          storage = "acme.json"
+          entryPoint = "https"
+          onDemand = false
+          OnHostRule = true
+- hosts: manager
+  vars_files:
+    - vars.yml
+    - vars.credentials.yml
+  tasks:
+    - copy:
+        dest: /root/traefik/stack.yml
+        content: |
+          version: '3'
+          services:
+            traefik:
+              image: traefik:v1.1.2
+              restart: always
+              ports:
+                - "80:80"
+                - "443:443"
+                - "8080:8080"
+              volumes:
+                - "/var/run/docker.sock:/var/run/docker.sock"
+              # - "/root/traefik/acme.json:/etc/traefik/acme.json"
+                - "/root/traefik/etc:/etc/traefik"
+              deploy:
+                mode: global
+           #labels_dns:
+
+           #  #image: registry.mif.io/swarm-labels-dns:test
+           #  image: mikeifomin/swarm-labels-dns
+           #  restart: always
+           #  volumes:
+           #    - "/var/run/docker.sock:/var/run/docker.sock"
+           #  environment:
+           #    DOCKER_HOST: unix:///var/run/docker.sock
+           #    DO_TOKEN: {{DO_TOKEN}} 
+           #  deploy:
+           #    mode: global
+    - command: "docker stack deploy -c stack.yml balancer"
+      args:
+        chdir: /root/traefik

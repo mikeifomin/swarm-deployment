@@ -1,0 +1,42 @@
+---
+  - include: facts.yml
+  - file: dest={{remote_path}} state=directory
+  - set_fact: MONGO_URL="mongodb://mongodb/{{item.global_MONGO_URL_db_name}}"
+  - set_fact: MONGO_OPTLOG_URL=MONGO_URL
+  - copy:
+      dest: "{{remote_path}}stack.yml"
+      content: |
+        version: "3"
+        networks:
+          db_default: 
+            external: true
+
+        services: 
+          node:
+            image: {{image_name}}
+            labels:
+              - "traefik.backend={{stack_name}}"
+              - "traefik.port={{port}}"
+              - "traefik.frontend.rule=Host:{{domain}}"
+            environment:
+              MONGO_URL:  {{MONGO_URL}}
+              MONGO_OPTLOG_URL: {{MONGO_OPTLOG_URL}}
+              ROOT_URL: https://{{domain}}
+            networks:
+              - db_default
+            deploy: 
+              replicas: 1
+              update_config:
+                parallelism: 1
+                delay: 30s
+              restart_policy:
+                condition: on-failure
+                max_attempts: 3
+              placement: {{default_placement | to_json}}
+  - debug: msg={{stack_name}}         
+  - shell: "docker stack deploy -c stack.yml {{stack_name}} --with-registry-auth"
+    args:
+      chdir: "{{remote_path}}"
+  - command: "docker stack ps {{stack_name}}"
+    register: out
+  - debug: msg=out.stdout

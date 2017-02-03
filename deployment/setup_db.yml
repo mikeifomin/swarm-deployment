@@ -1,0 +1,38 @@
+---
+- hosts: manager
+  vars_files:
+    - vars.yml
+    - vars.credentials.yml
+  tasks:
+    - file: dest=/root/db/mongo/data state=directory
+    - file: dest=/root/db/redis/data state=directory
+    - copy:
+        dest: /root/db/stack.yml
+        content: |
+          version: '3'
+          volumes:
+            mongo: 
+            redis: 
+          services:
+            mongodb:
+              image: mongo:3.2
+              restart: always
+              volumes:
+                - mongo:/data/db
+              deploy:
+                replicas: 1
+                placement: {{default_placement | to_json}}
+            redis:
+              image: redis:3.2
+              restart: always
+              volumes:
+                - redis:/data
+              deploy:
+                replicas: 1
+                placement: {{default_placement | to_json}}
+    - command: "docker stack deploy -c stack.yml db"
+      args:
+        chdir: /root/db/
+    - command: "docker stack ps db"
+      register: out
+    - debug: msg={{out.stdout}}

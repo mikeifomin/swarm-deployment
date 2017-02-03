@@ -1,0 +1,6 @@
+---
+- hosts: all
+  tasks:
+    - command: "docker-compose kill"
+      args:
+        chdir: /root/traefik
